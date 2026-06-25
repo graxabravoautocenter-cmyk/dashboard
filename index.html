@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard – Graxa Bravo Auto Center | 2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      --verde:     #5bbd72;
+      --verde-esc: #3a9952;
+      --cinza-bg:  #f2f4f6;
+      --cinza-hdr: #3a3f47;
+      --branco:    #ffffff;
+      --texto:     #2d3748;
+      --sub:       #718096;
+      --borda:     #e2e8f0;
+      --vermelho:  #e05252;
+      --azul:      #3b82f6;
+      --amarelo:   #f59e0b;
+      --roxo:      #8b5cf6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--cinza-bg);
+      color: var(--texto);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: var(--cinza-hdr);
+      color: #fff;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .header-logo { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+    .header-logo span { color: var(--verde); }
+    .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .header-badge {
+      background: var(--verde);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    /* STATUS BAR */
+    .status-bar {
+      background: #2d3340;
+      color: #a0aec0;
+      font-size: 11px;
+      padding: 6px 28px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--verde);
+      display: inline-block;
+      margin-right: 5px;
+      animation: pulse 2s infinite;
+    }
+    .status-dot.loading { background: var(--amarelo); animation: none; }
+    .status-dot.error   { background: var(--vermelho); animation: none; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .countdown { color: #718096; }
+
+    /* ── LAYOUT ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 22px 20px; }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--sub);
+      margin-bottom: 14px;
+      margin-top: 26px;
+    }
+
+    /* ── CARDS ── */
+    .cards { display: flex; flex-wrap: wrap; gap: 16px; }
+
+    .card {
+      background: var(--branco);
+      border-radius: 12px;
+      padding: 20px 22px;
+      flex: 1 1 200px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+      border-top: 3px solid var(--borda);
+    }
+    .card.verde  { border-top-color: var(--verde); }
+    .card.azul   { border-top-color: var(--azul); }
+    .card.roxo   { border-top-color: var(--roxo); }
+    .card.laranja{ border-top-color: var(--amarelo); }
+
+    .card-label { font-size: 11px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+    .card-value { font-size: 26px; font-weight: 800; color: var(--texto); line-height: 1.1; transition: opacity 0.3s; }
+    .card-value.refreshing { opacity: 0.4; }
+
+    .card-progress { height: 4px; background: var(--borda); border-radius: 99px; margin-top: 10px; overflow: hidden; }
+    .card-progress-fill { height: 100%; border-radius: 99px; transition: width 0.8s ease; }
+    .pct-label { font-size: 11px; font-weight: 700; margin-top: 4px; }
+    .pct-ok  { color: var(--verde-esc); }
+    .pct-low { color: var(--vermelho); }
+
+    /* ── GRÁFICOS ── */
+    .charts { display: flex; flex-wrap: wrap; gap: 20px; }
+
+    .chart-card {
+      background: var(--branco);
+      border-radius: 12px;
+      padding: 22px 22px 18px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+      flex: 1 1 300px;
+    }
+    .chart-card.full { flex: 1 1 100%; }
+    .chart-title { font-size: 13px; font-weight: 700; color: var(--texto); margin-bottom: 3px; }
+    .chart-sub   { font-size: 11px; color: var(--sub); margin-bottom: 16px; }
+
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--sub); }
+    .legend-dot  { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* ── FOOTER ── */
+    .footer { text-align: center; padding: 20px; font-size: 11px; color: #cbd5e0; }
+
+    /* ── LOGIN ── */
+    #app { display: none; }
+    .login-overlay {
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #2d3340 0%, #3a3f47 100%);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; padding: 20px;
+    }
+    .login-box {
+      background: var(--branco);
+      border-radius: 16px;
+      padding: 38px 34px;
+      width: 100%; max-width: 360px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+      text-align: center;
+    }
+    .login-logo { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px; }
+    .login-logo span { color: var(--verde); }
+    .login-sub { font-size: 12px; color: var(--sub); margin-bottom: 26px; }
+    .login-field {
+      width: 100%; padding: 13px 14px;
+      border: 1.5px solid var(--borda); border-radius: 9px;
+      font-size: 15px; font-family: inherit; color: var(--texto);
+      outline: none; transition: border-color .2s;
+    }
+    .login-field:focus { border-color: var(--verde); }
+    .login-btn {
+      width: 100%; margin-top: 14px; padding: 13px;
+      background: var(--verde); color: #fff;
+      border: none; border-radius: 9px;
+      font-size: 15px; font-weight: 700; font-family: inherit;
+      cursor: pointer; transition: background .2s;
+    }
+    .login-btn:hover { background: var(--verde-esc); }
+    .login-btn:disabled { opacity: .6; cursor: wait; }
+    .login-error {
+      color: var(--vermelho); font-size: 12px; font-weight: 600;
+      margin-top: 14px; min-height: 16px;
+    }
+    .login-lock { font-size: 30px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="loginOverlay">
+  <form class="login-box" id="loginForm" autocomplete="off">
+    <div class="login-lock">🔒</div>
+    <div class="login-logo">Graxa Bravo<span>.</span></div>
+    <div class="login-sub">Dashboard protegido · informe a senha</div>
+    <input type="password" id="pwInput" class="login-field" placeholder="Senha de acesso" autofocus autocomplete="current-password"/>
+    <button type="submit" id="loginBtn" class="login-btn">Entrar</button>
+    <div class="login-error" id="loginError"></div>
+  </form>
+</div>
+
+<div id="app">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-logo">Graxa Bravo<span>.</span></div>
+  <div class="header-right">
+    <div class="header-badge">🎯 Meta: R$ 150k / 400 vendas</div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <span><span class="status-dot" id="statusDot"></span><span id="statusText">Carregando…</span></span>
+  <span id="lastUpdate" class="countdown"></span>
+  <span id="nextUpdate" class="countdown"></span><span style="color:#4a5568"> · dados atualizados todo dia às 07:00</span>
+</div>
+
+<div class="container">
+
+  <!-- CARDS MÊS ATUAL -->
+  <div class="section-title">📅 <span id="labelMesAtual">Mês atual</span></div>
+  <div class="cards">
+    <div class="card verde">
+      <div class="card-label">💰 Faturamento</div>
+      <div class="card-value" id="cFat">—</div>
+      <div class="card-progress"><div class="card-progress-fill" id="pFat" style="width:0%;background:var(--verde);"></div></div>
+      <div class="pct-label" id="pFatLbl"></div>
+    </div>
+    <div class="card azul">
+      <div class="card-label">🛒 Vendas realizadas</div>
+      <div class="card-value" id="cVend">—</div>
+      <div class="card-progress"><div class="card-progress-fill" id="pVend" style="width:0%;background:var(--azul);"></div></div>
+      <div class="pct-label" id="pVendLbl"></div>
+    </div>
+    <div class="card roxo">
+      <div class="card-label">🎯 Ticket médio</div>
+      <div class="card-value" id="cTick">—</div>
+      <div class="card-progress"><div class="card-progress-fill" id="pTick" style="width:0%;background:var(--roxo);"></div></div>
+      <div class="pct-label" id="pTickLbl"></div>
+    </div>
+    <div class="card laranja">
+      <div class="card-label">👥 Clientes atendidos</div>
+      <div class="card-value" id="cCli">—</div>
+      <div class="card-sub" style="font-size:11px;color:var(--sub);margin-top:8px;">Clientes únicos no período</div>
+    </div>
+  </div>
+
+  <!-- GRÁFICOS -->
+  <div class="section-title">📊 Histórico 2026 — Jan a Jun</div>
+  <div class="charts">
+
+    <div class="chart-card full">
+      <div class="chart-title">Faturamento Mensal</div>
+      <div class="chart-sub">Receita por competência · linha vermelha = meta R$ 150.000</div>
+      <canvas id="chartFaturamento" height="90"></canvas>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--verde);"></div> Faturamento</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--vermelho);"></div> Meta R$ 150.000</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Número de Vendas</div>
+      <div class="chart-sub">Vendas realizadas · meta 400</div>
+      <canvas id="chartVendas" height="160"></canvas>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--azul);"></div> Vendas</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--vermelho);"></div> Meta 400</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Ticket Médio</div>
+      <div class="chart-sub">Evolução mensal · meta R$ 375,00</div>
+      <canvas id="chartTicket" height="160"></canvas>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--roxo);"></div> Ticket médio</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--vermelho);"></div> Meta R$ 375</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="footer">Graxa Bravo Auto Center · Dados: QuantoSobra · 2026</div>
+
+</div><!-- /#app -->
+
+<script>
+// ── METAS ─────────────────────────────────────────────────────
+const META_FAT  = 150000;
+const META_VEND = 400;
+const META_TICK = 375;
+const REFRESH_MS = 60 * 60 * 1000; // 1 hora (dados atualizam às 7h)
+
+// ── PALETA ────────────────────────────────────────────────────
+const COR_VERDE   = '#5bbd72';
+const COR_AZUL    = '#3b82f6';
+const COR_ROXO    = '#8b5cf6';
+const COR_META    = '#e05252';
+const COR_GRID    = '#edf2f7';
+
+function rgba(hex, a) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function brl(v, dec=2) {
+  return 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:dec, maximumFractionDigits:dec});
+}
+
+// ── INSTÂNCIAS DE CHART ───────────────────────────────────────
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.size   = 11;
+Chart.defaults.color       = '#718096';
+
+let charts = {};
+
+function buildCharts(d) {
+  const gridOpts = { color: COR_GRID, drawBorder: false };
+
+  // Faturamento
+  charts.fat = new Chart(document.getElementById('chartFaturamento'), {
+    type: 'bar',
+    data: {
+      labels: d.meses,
+      datasets: [
+        {
+          label: 'Faturamento',
+          data: d.receita,
+          backgroundColor: d.receita.map(v => rgba(v >= META_FAT ? COR_VERDE : COR_VERDE, v >= META_FAT ? 0.92 : 0.62)),
+          borderColor: COR_VERDE, borderWidth: 1, borderRadius: 6, order: 2
+        },
+        {
+          label: 'Meta R$ 150.000',
+          data: Array(d.meses.length).fill(META_FAT),
+          type: 'line', borderColor: COR_META, borderWidth: 2,
+          borderDash: [6,3], pointRadius: 0, fill: false, order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true, animation: { duration: 600 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.datasetIndex === 0 ? ' ' + brl(ctx.raw) : ' Meta: ' + brl(ctx.raw, 0) } }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: gridOpts, ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } }
+      }
+    }
+  });
+
+  // Vendas
+  charts.vend = new Chart(document.getElementById('chartVendas'), {
+    type: 'bar',
+    data: {
+      labels: d.meses,
+      datasets: [
+        {
+          label: 'Vendas',
+          data: d.vendas,
+          backgroundColor: d.vendas.map(v => rgba(COR_AZUL, v >= META_VEND ? 0.9 : 0.6)),
+          borderColor: COR_AZUL, borderWidth: 1, borderRadius: 6, order: 2
+        },
+        {
+          label: 'Meta 400',
+          data: Array(d.meses.length).fill(META_VEND),
+          type: 'line', borderColor: COR_META, borderWidth: 2,
+          borderDash: [6,3], pointRadius: 0, fill: false, order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true, animation: { duration: 600 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.datasetIndex === 0 ? ' ' + ctx.raw + ' vendas' : ' Meta: ' + ctx.raw } }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: gridOpts, beginAtZero: true }
+      }
+    }
+  });
+
+  // Ticket médio
+  charts.tick = new Chart(document.getElementById('chartTicket'), {
+    type: 'line',
+    data: {
+      labels: d.meses,
+      datasets: [
+        {
+          label: 'Ticket médio',
+          data: d.ticket,
+          borderColor: COR_ROXO, backgroundColor: rgba(COR_ROXO, 0.08),
+          borderWidth: 2.5, fill: true, tension: 0.35,
+          pointBackgroundColor: d.ticket.map(v => v >= META_TICK ? COR_ROXO : rgba(COR_ROXO, 0.5)),
+          pointRadius: 5, pointHoverRadius: 7, order: 2
+        },
+        {
+          label: 'Meta R$ 375',
+          data: Array(d.meses.length).fill(META_TICK),
+          borderColor: COR_META, borderWidth: 2,
+          borderDash: [6,3], pointRadius: 0, fill: false, order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true, animation: { duration: 600 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.datasetIndex === 0 ? ' ' + brl(ctx.raw) : ' Meta: ' + brl(ctx.raw, 0) } }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: gridOpts, ticks: { callback: v => 'R$ ' + v } }
+      }
+    }
+  });
+}
+
+function updateChartData(chart, newDatasets) {
+  newDatasets.forEach((ds, i) => {
+    chart.data.datasets[i].data = ds;
+  });
+  chart.update('active');
+}
+
+// ── ATUALIZA UI ───────────────────────────────────────────────
+function applyData(d) {
+  const ma = d.mesAtual;
+
+  // Label mês atual
+  const nomesMes = {JAN:'Janeiro',FEV:'Fevereiro',MAR:'Março',ABR:'Abril',MAI:'Maio',JUN:'Junho',
+                    JUL:'Julho',AGO:'Agosto',SET:'Setembro',OUT:'Outubro',NOV:'Novembro',DEZ:'Dezembro'};
+  document.getElementById('labelMesAtual').textContent = (nomesMes[ma.mes] || ma.mes) + ' 2026 — mês atual';
+
+  // Cards
+  const pctFat  = Math.min(100, Math.round(ma.receita / META_FAT  * 100));
+  const pctVend = Math.min(100, Math.round(ma.vendas  / META_VEND * 100));
+  const pctTick = Math.min(120, Math.round(ma.ticket  / META_TICK * 100));
+
+  document.getElementById('cFat').textContent  = brl(ma.receita, 0);
+  document.getElementById('cVend').textContent = ma.vendas;
+  document.getElementById('cTick').textContent = brl(ma.ticket);
+  document.getElementById('cCli').textContent  = ma.clientes;
+
+  document.getElementById('pFat').style.width  = pctFat  + '%';
+  document.getElementById('pVend').style.width = pctVend + '%';
+  document.getElementById('pTick').style.width = Math.min(100, pctTick) + '%';
+
+  const cls = pct => pct >= 100 ? 'pct-label pct-ok' : 'pct-label pct-low';
+  document.getElementById('pFatLbl').className  = cls(pctFat);
+  document.getElementById('pVendLbl').className = cls(pctVend);
+  document.getElementById('pTickLbl').className = cls(pctTick);
+  document.getElementById('pFatLbl').textContent  = pctFat  + '% da meta (' + brl(META_FAT, 0) + ')';
+  document.getElementById('pVendLbl').textContent = pctVend + '% da meta (' + META_VEND + ' vendas)';
+  document.getElementById('pTickLbl').textContent = pctTick + '% da meta (' + brl(META_TICK, 0) + ')' + (pctTick >= 100 ? ' ✅' : '');
+
+  // Gráficos
+  if (!charts.fat) {
+    buildCharts(d);
+  } else {
+    const metaFatArr  = Array(d.meses.length).fill(META_FAT);
+    const metaVendArr = Array(d.meses.length).fill(META_VEND);
+    const metaTickArr = Array(d.meses.length).fill(META_TICK);
+    charts.fat.data.labels  = d.meses;
+    charts.vend.data.labels = d.meses;
+    charts.tick.data.labels = d.meses;
+    updateChartData(charts.fat,  [d.receita, metaFatArr]);
+    updateChartData(charts.vend, [d.vendas,  metaVendArr]);
+    updateChartData(charts.tick, [d.ticket,  metaTickArr]);
+  }
+}
+
+// ── FETCH DE DADOS ────────────────────────────────────────────
+let lastData     = null;
+let nextRefreshAt = null;
+let countdownTimer = null;
+
+function setStatus(state, msg) {
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  dot.className  = 'status-dot' + (state === 'ok' ? '' : ' ' + state);
+  text.textContent = msg;
+}
+
+function updateCountdown() {
+  if (!nextRefreshAt) return;
+  const sec = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  if (sec > 0) {
+    document.getElementById('nextUpdate').textContent = 'próxima releitura em ' + m + ':' + String(s).padStart(2,'0');
+  } else {
+    document.getElementById('nextUpdate').textContent = '';
+  }
+}
+
+// ── CRIPTOGRAFIA (Web Crypto: AES-256-GCM + PBKDF2) ──────────
+let sessionPassword = sessionStorage.getItem('gbac_pw') || null;
+
+function b64ToBytes(s) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+
+async function decryptPayload(password, enc) {
+  const salt = b64ToBytes(enc.salt);
+  const iv   = b64ToBytes(enc.iv);
+  const ct   = b64ToBytes(enc.ct);
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations: enc.iters || 250000, hash:'SHA-256' },
+    keyMaterial, { name:'AES-GCM', length:256 }, false, ['decrypt']);
+  const plain = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct);
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+async function loadEncrypted(password) {
+  const resp = await fetch('./dashboard-data.enc?t=' + Date.now());
+  if (!resp.ok) throw new Error('arquivo não encontrado');
+  const enc = await resp.json();
+  return await decryptPayload(password, enc); // lança se a senha estiver errada (tag inválida)
+}
+
+async function fetchData() {
+  if (!sessionPassword) return;
+  setStatus('loading', 'Atualizando…');
+  document.querySelectorAll('.card-value').forEach(el => el.classList.add('refreshing'));
+
+  let data = null;
+  try {
+    data = await loadEncrypted(sessionPassword);
+  } catch(_) {}
+
+  document.querySelectorAll('.card-value').forEach(el => el.classList.remove('refreshing'));
+
+  if (data) {
+    lastData = data;
+    applyData(data);
+    const ts = new Date(data.updatedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('lastUpdate').textContent = 'dados de ' + ts;
+    setStatus('ok', 'Atualizado');
+  } else if (lastData) {
+    setStatus('error', 'Sem conexão — exibindo último cache');
+  } else {
+    setStatus('error', 'Não foi possível carregar os dados');
+  }
+
+  nextRefreshAt = Date.now() + REFRESH_MS;
+  updateCountdown();
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────
+function startApp() {
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  fetchData();
+  setInterval(fetchData, REFRESH_MS);
+  setInterval(updateCountdown, 1000);
+}
+
+async function tryLogin(password) {
+  const data = await loadEncrypted(password); // valida descriptografando de verdade
+  sessionPassword = password;
+  sessionStorage.setItem('gbac_pw', password);
+  lastData = data;
+  startApp();
+}
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginError');
+  const pw  = document.getElementById('pwInput').value;
+  err.textContent = '';
+  btn.disabled = true; btn.textContent = 'Verificando…';
+  try {
+    await tryLogin(pw);
+  } catch(_) {
+    err.textContent = 'Senha incorreta. Tente novamente.';
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwInput').focus();
+  } finally {
+    btn.disabled = false; btn.textContent = 'Entrar';
+  }
+});
+
+// ── INIT ──────────────────────────────────────────────────────
+// Se a senha já está na sessão (refresh na mesma aba), entra direto
+(async function() {
+  if (sessionPassword) {
+    try { await loadEncrypted(sessionPassword); startApp(); return; }
+    catch(_) { sessionStorage.removeItem('gbac_pw'); sessionPassword = null; }
+  }
+  document.getElementById('pwInput').focus();
+})();
+</script>
+</body>
+</html>
