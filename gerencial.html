@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Painel gerencial - Bravo Auto Center</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:24px;color:#222;background:#fafafa}
+h1{font-size:20px;margin:0 0 4px}
+h2{font-size:16px;margin:28px 0 8px}
+.sub{color:#666;font-size:13px;margin-bottom:20px}
+.nav a{margin-right:14px;font-size:14px}
+.cards{display:flex;gap:12px;margin:16px 0;flex-wrap:wrap}
+.card{background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:12px 16px;min-width:170px}
+.card b{display:block;font-size:22px;margin-top:4px}
+.card small{color:#666}
+table{border-collapse:collapse;width:100%;background:#fff;font-size:14px}
+th,td{border-bottom:1px solid #eee;padding:8px;text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{background:#f3f3f3}
+#login{max-width:320px}
+#login input{width:100%;padding:8px;margin:8px 0;box-sizing:border-box}
+#login button{padding:8px 14px}
+#erro{color:#b00020;font-size:13px}
+.box{display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+</style></head><body>
+<div id="login" hidden>
+  <h1>Acesso restrito</h1>
+  <input type="password" id="pw" placeholder="Senha de acesso" autocomplete="current-password">
+  <button id="entrar">Entrar</button>
+  <div id="erro"></div>
+</div>
+<div id="app" hidden>
+  <h1>Painel gerencial</h1>
+  <div class="sub" id="gerado"></div>
+  <div class="nav">
+    <a href="./">Faturamento</a>
+    <a href="./followup.html">Follow-up WhatsApp</a>
+  </div>
+
+  <div class="cards">
+    <div class="card"><small id="k1-l"></small><b id="k1"></b></div>
+    <div class="card"><small>Faturamento acumulado (jul a nov)</small><b id="k2"></b></div>
+    <div class="card"><small>Mensagens de follow-up enviadas</small><b id="k3"></b></div>
+    <div class="card"><small>Lançamentos sem telefone</small><b id="k4"></b></div>
+  </div>
+
+  <h2>Faturamento por mês</h2>
+  <table>
+    <thead><tr><th>Mês</th><th>Receita</th><th>Vendas</th><th>Ticket médio</th><th>Saldo em bancos</th></tr></thead>
+    <tbody id="fat"></tbody>
+  </table>
+
+  <h2>Follow-up WhatsApp por mês</h2>
+  <table>
+    <thead><tr><th>Mês</th><th>Lançamentos</th><th>Enviados</th><th>Sem telefone</th><th>PJ</th><th>Erros de envio</th></tr></thead>
+    <tbody id="fup"></tbody>
+  </table>
+
+  <h2>Categorias dos lançamentos (follow-up, total)</h2>
+  <div class="box" id="pizza"></div>
+</div>
+<script>
+const enc64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const brl = v => 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const num = v => Number(v).toLocaleString('pt-BR');
+const pct = (n, base) => base ? (100 * n / base).toFixed(1).replace('.', ',') + '%' : '0%';
+
+async function decryptPayload(password, enc) {
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: enc64(enc.salt), iterations: enc.iters || 250000, hash: 'SHA-256' },
+    km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: enc64(enc.iv) }, key, enc64(enc.ct));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+async function loadData(password) {
+  const resp = await fetch('./gerencial-data.enc?t=' + Date.now());
+  if (!resp.ok) throw new Error('arquivo não encontrado');
+  return decryptPayload(password, await resp.json());
+}
+
+function celula(tr, texto) {
+  const td = document.createElement('td'); td.textContent = texto; tr.appendChild(td);
+}
+
+function desenhaPizza(cats) {
+  const total = cats.reduce((s, c) => s + c.valor, 0) || 1;
+  const cores = ['#2d7ff9', '#f5a623', '#d0021b', '#9b9b9b'];
+  const cx = 90, cy = 90, r = 80;
+  let ang = -Math.PI / 2, svg = '<svg width="180" height="180" viewBox="0 0 180 180">';
+  const legenda = document.createElement('div');
+  cats.forEach((c, i) => {
+    const frac = c.valor / total;
+    if (frac > 0) {
+      if (frac >= 0.9999) {
+        svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + cores[i] + '"/>';
+      } else {
+        const a1 = ang + frac * 2 * Math.PI;
+        const x1 = cx + r * Math.cos(ang), y1 = cy + r * Math.sin(ang);
+        const x2 = cx + r * Math.cos(a1), y2 = cy + r * Math.sin(a1);
+        const large = frac > 0.5 ? 1 : 0;
+        svg += '<path d="M' + cx + ',' + cy + ' L' + x1 + ',' + y1 + ' A' + r + ',' + r + ' 0 ' + large + ' 1 ' + x2 + ',' + y2 + ' Z" fill="' + cores[i] + '"/>';
+        ang = a1;
+      }
+    }
+    const linha = document.createElement('div');
+    linha.style.margin = '4px 0'; linha.style.color = cores[i];
+    linha.textContent = '\u25a0 ' + c.nome + ': ' + num(c.valor) + ' (' + pct(c.valor, total) + ')';
+    legenda.appendChild(linha);
+  });
+  svg += '</svg>';
+  const wrap = document.createElement('div'); wrap.innerHTML = svg;
+  document.getElementById('pizza').append(wrap, legenda);
+}
+
+function render(d) {
+  document.getElementById('gerado').textContent = 'Gerado em ' + d.gerado_em + '. Fonte: QuantoSobra e log de follow-up.';
+  document.getElementById('k1-l').textContent = 'Receita de ' + d.mes_atual.nome + ' (até hoje)';
+  document.getElementById('k1').textContent = brl(d.mes_atual.receita);
+  document.getElementById('k2').textContent = brl(d.faturamento.reduce((s, m) => s + m.receita, 0));
+  document.getElementById('k3').textContent = num(d.followup_total.enviados);
+  document.getElementById('k4').textContent = pct(d.followup_total.sem_telefone, d.followup_total.lancamentos) + ' (' + num(d.followup_total.sem_telefone) + ')';
+
+  const fat = document.getElementById('fat');
+  d.faturamento.forEach(m => {
+    const tr = document.createElement('tr');
+    celula(tr, m.mes); celula(tr, brl(m.receita)); celula(tr, num(m.vendas));
+    celula(tr, brl(m.ticket)); celula(tr, brl(m.saldo));
+    fat.appendChild(tr);
+  });
+
+  const fup = document.getElementById('fup');
+  d.followup.forEach(m => {
+    const tr = document.createElement('tr');
+    celula(tr, m.mes); celula(tr, num(m.lancamentos));
+    celula(tr, num(m.enviados) + ' (' + pct(m.enviados, m.lancamentos) + ')');
+    celula(tr, num(m.sem_telefone) + ' (' + pct(m.sem_telefone, m.lancamentos) + ')');
+    celula(tr, num(m.pj) + ' (' + pct(m.pj, m.lancamentos) + ')');
+    celula(tr, num(m.erros));
+    fup.appendChild(tr);
+  });
+
+  desenhaPizza(d.categorias);
+  document.getElementById('app').hidden = false;
+}
+
+async function entrar(pw) {
+  try {
+    const d = await loadData(pw);
+    sessionStorage.setItem('gbac_pw', pw);
+    document.getElementById('login').hidden = true;
+    render(d);
+  } catch (e) {
+    document.getElementById('erro').textContent = 'Senha incorreta ou dados indisponíveis.';
+    document.getElementById('login').hidden = false;
+  }
+}
+
+document.getElementById('entrar').onclick = () => entrar(document.getElementById('pw').value);
+document.getElementById('pw').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(e.target.value); });
+const salva = sessionStorage.getItem('gbac_pw');
+if (salva) entrar(salva); else document.getElementById('login').hidden = false;
+</script>
+</body></html>
