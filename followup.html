@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Follow-up WhatsApp por mês</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:24px;color:#222;background:#fafafa}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:#666;font-size:13px;margin-bottom:20px}
+.cards{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.card{background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:12px 16px;min-width:160px}
+.card b{display:block;font-size:22px}
+table{border-collapse:collapse;width:100%;background:#fff;font-size:14px;margin-bottom:24px}
+th,td{border-bottom:1px solid #eee;padding:8px;text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{background:#f3f3f3}
+.bar-row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+.lbl{width:70px}
+.bar{flex:1;background:#eee;border-radius:4px;height:14px;overflow:hidden}
+.bar div{background:#2d7ff9;height:100%}
+.val{width:50px;text-align:right}
+#login{max-width:320px}
+#login input{width:100%;padding:8px;margin:8px 0;box-sizing:border-box}
+#login button{padding:8px 14px}
+#erro{color:#b00020;font-size:13px}
+</style></head><body>
+<div id="login" hidden>
+  <h1>Acesso restrito</h1>
+  <input type="password" id="pw" placeholder="Senha de acesso" autocomplete="current-password">
+  <button id="entrar">Entrar</button>
+  <div id="erro"></div>
+</div>
+<div id="app" hidden>
+  <h1>Follow-up WhatsApp por mês</h1>
+  <div class="sub" id="gerado"></div>
+  <div class="cards">
+    <div class="card">Mensagens enviadas<b id="tot-env"></b></div>
+    <div class="card">Erros de envio<b id="tot-err"></b></div>
+    <div class="card">Meses com dados<b id="tot-meses"></b></div>
+  </div>
+  <h2 style="font-size:16px">Envios por mês</h2>
+  <div id="barras"></div>
+  <h2 style="font-size:16px;margin-top:24px">Resumo mensal</h2>
+  <table>
+    <thead><tr><th>Mês</th><th>Execuções</th><th>Lançamentos</th><th>Enviados</th><th>Erros</th><th>Sem telefone</th><th>PJ</th></tr></thead>
+    <tbody id="linhas"></tbody>
+  </table>
+</div>
+<script>
+const enc64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+async function decryptPayload(password, enc) {
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: enc64(enc.salt), iterations: enc.iters || 250000, hash: 'SHA-256' },
+    km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: enc64(enc.iv) }, key, enc64(enc.ct));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+async function loadData(password) {
+  const resp = await fetch('./followup-data.enc?t=' + Date.now());
+  if (!resp.ok) throw new Error('arquivo não encontrado');
+  return decryptPayload(password, await resp.json()); // lança se a senha estiver errada
+}
+
+function celula(tr, texto) {
+  const td = document.createElement('td'); td.textContent = texto; tr.appendChild(td);
+}
+
+function render(d) {
+  document.getElementById('gerado').textContent = 'Gerado em ' + d.gerado_em + '. Mensagens = envios com status 201.';
+  document.getElementById('tot-env').textContent = d.total_enviados;
+  document.getElementById('tot-err').textContent = d.total_erros;
+  document.getElementById('tot-meses').textContent = d.meses.length;
+  const max = Math.max(1, ...d.meses.map(m => m.enviados));
+  const barras = document.getElementById('barras');
+  const linhas = document.getElementById('linhas');
+  d.meses.forEach(m => {
+    const row = document.createElement('div'); row.className = 'bar-row';
+    const l = document.createElement('span'); l.className = 'lbl'; l.textContent = m.mes;
+    const b = document.createElement('div'); b.className = 'bar';
+    const f = document.createElement('div'); f.style.width = (100 * m.enviados / max) + '%'; b.appendChild(f);
+    const v = document.createElement('span'); v.className = 'val'; v.textContent = m.enviados;
+    row.append(l, b, v); barras.appendChild(row);
+    const tr = document.createElement('tr');
+    celula(tr, m.mes); celula(tr, m.execucoes); celula(tr, m.lancamentos);
+    celula(tr, m.enviados); celula(tr, m.erros); celula(tr, m.sem_telefone); celula(tr, m.pj);
+    linhas.appendChild(tr);
+  });
+  document.getElementById('app').hidden = false;
+}
+
+async function entrar(pw) {
+  try {
+    const d = await loadData(pw);
+    sessionStorage.setItem('gbac_pw', pw);
+    document.getElementById('login').hidden = true;
+    render(d);
+  } catch (e) {
+    document.getElementById('erro').textContent = 'Senha incorreta ou dados indisponíveis.';
+    document.getElementById('login').hidden = false;
+  }
+}
+
+document.getElementById('entrar').onclick = () => entrar(document.getElementById('pw').value);
+document.getElementById('pw').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(e.target.value); });
+
+// Reaproveita a senha já digitada no dashboard de faturamento (mesma origem) ou pede de novo.
+const salva = sessionStorage.getItem('gbac_pw');
+if (salva) entrar(salva); else document.getElementById('login').hidden = false;
+</script>
+</body></html>
