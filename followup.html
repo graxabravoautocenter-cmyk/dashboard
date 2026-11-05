@@ -38,6 +38,8 @@ th{background:#f3f3f3}
     <div class="card">Erros de envio<b id="tot-err"></b></div>
     <div class="card">Meses com dados<b id="tot-meses"></b></div>
   </div>
+  <h2 style="font-size:16px">Categorias do total de lançamentos</h2>
+  <div id="pizza" style="display:flex;gap:24px;align-items:center;margin-bottom:24px;flex-wrap:wrap"></div>
   <h2 style="font-size:16px">Envios por mês</h2>
   <div id="barras"></div>
   <h2 style="font-size:16px;margin-top:24px">Resumo mensal</h2>
@@ -68,11 +70,50 @@ function celula(tr, texto) {
   const td = document.createElement('td'); td.textContent = texto; tr.appendChild(td);
 }
 
+function pct(n, base) {
+  return base ? (100 * n / base).toFixed(1).replace('.', ',') + '%' : '0%';
+}
+
+function desenhaPizza(cats) {
+  const total = cats.reduce((s, c) => s + c.valor, 0) || 1;
+  const cores = ['#2d7ff9', '#f5a623', '#d0021b', '#9b9b9b'];
+  const cx = 90, cy = 90, r = 80;
+  let ang = -Math.PI / 2;
+  let svg = '<svg width="180" height="180" viewBox="0 0 180 180">';
+  const legenda = document.createElement('div');
+  cats.forEach((c, i) => {
+    const frac = c.valor / total;
+    if (frac > 0) {
+      if (frac >= 0.9999) {
+        svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + cores[i] + '"/>';
+      } else {
+        const a1 = ang + frac * 2 * Math.PI;
+        const x1 = cx + r * Math.cos(ang), y1 = cy + r * Math.sin(ang);
+        const x2 = cx + r * Math.cos(a1), y2 = cy + r * Math.sin(a1);
+        const large = frac > 0.5 ? 1 : 0;
+        svg += '<path d="M' + cx + ',' + cy + ' L' + x1 + ',' + y1 + ' A' + r + ',' + r + ' 0 ' + large + ' 1 ' + x2 + ',' + y2 + ' Z" fill="' + cores[i] + '"/>';
+        ang = a1;
+      }
+    }
+    const linha = document.createElement('div');
+    linha.style.margin = '4px 0';
+    linha.textContent = '■ ' + c.nome + ': ' + c.valor + ' (' + pct(c.valor, total) + ')';
+    linha.style.color = cores[i];
+    legenda.appendChild(linha);
+  });
+  svg += '</svg>';
+  const box = document.getElementById('pizza');
+  const wrap = document.createElement('div');
+  wrap.innerHTML = svg;
+  box.append(wrap, legenda);
+}
+
 function render(d) {
   document.getElementById('gerado').textContent = 'Gerado em ' + d.gerado_em + '. Mensagens = envios com status 201.';
   document.getElementById('tot-env').textContent = d.total_enviados;
   document.getElementById('tot-err').textContent = d.total_erros;
   document.getElementById('tot-meses').textContent = d.meses.length;
+  desenhaPizza(d.categorias);
   const max = Math.max(1, ...d.meses.map(m => m.enviados));
   const barras = document.getElementById('barras');
   const linhas = document.getElementById('linhas');
@@ -84,8 +125,11 @@ function render(d) {
     const v = document.createElement('span'); v.className = 'val'; v.textContent = m.enviados;
     row.append(l, b, v); barras.appendChild(row);
     const tr = document.createElement('tr');
-    celula(tr, m.mes); celula(tr, m.execucoes); celula(tr, m.lancamentos);
-    celula(tr, m.enviados); celula(tr, m.erros); celula(tr, m.sem_telefone); celula(tr, m.pj);
+    celula(tr, m.mes); celula(tr, m.execucoes); celula(tr, m.lancamentos + ' (100%)');
+    celula(tr, m.enviados + ' (' + pct(m.enviados, m.lancamentos) + ')');
+    celula(tr, m.erros + ' (' + pct(m.erros, m.lancamentos) + ')');
+    celula(tr, m.sem_telefone + ' (' + pct(m.sem_telefone, m.lancamentos) + ')');
+    celula(tr, m.pj + ' (' + pct(m.pj, m.lancamentos) + ')');
     linhas.appendChild(tr);
   });
   document.getElementById('app').hidden = false;
